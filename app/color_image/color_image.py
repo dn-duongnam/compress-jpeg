@@ -16,9 +16,7 @@ from collections import Counter
 import time
 import cv2
 
-
-
-def main():
+def color_image_jpeg(args):
     st.title('Image Display App')
 
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
@@ -31,7 +29,7 @@ def main():
             img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
         elif uploaded_file.type == 'image/png':
             img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
-        elif uploaded_file.type in ['image/arw', 'image/cr2']:
+        else:
             with rawpy.imread(uploaded_file) as raw:
                 img_raw = raw.postprocess()
         
@@ -482,7 +480,9 @@ def main():
         fig_1 = px.imshow(originalImg)
         fig_1.update_layout(title='Image Original')
         
-        fig_2 = px.imshow(myYcbcr2rgb(loadedImg) if useYCbCr else blocks2img(dedctBlocks).astype(np.int16))
+        fig_2 = px.imshow(myYcbcr2rgb(loadedImg) 
+                          if useYCbCr else blocks2img(dctBlocks).astype(np.int16)
+                          )
         fig_2.update_layout(title='Image Decompress')
         
         st.write("### Compare")
@@ -501,12 +501,6 @@ def main():
             return 10 * np.log(((255 * 255) / mse), 10)
                                 
 
-       
-        
-        
-        
-        
-        
         # ycbcr = rgb2ycbcr(img)
         # # Plot ảnh original
         # fig_original = px.imshow(originalImg)
@@ -550,6 +544,3 @@ def main():
         # # Display images using Streamlit
         # st.subheader('New Image')
         # st.plotly_chart(fig_newImg)
-
-if __name__ == '__main__':
-    main()

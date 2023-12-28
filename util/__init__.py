@@ -1,0 +1,1 @@
+from .MultiPage import MultiPage
