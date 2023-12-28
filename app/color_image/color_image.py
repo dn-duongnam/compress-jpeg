@@ -210,15 +210,19 @@ def color_image_jpeg(args):
         Q_90 = np.floor(QY * alpha + 0.5)
         QY_reordered = np.flipud(QY)
         Q_90_reordered = np.flipud(Q_90)
+        
+        min_value = min(np.min(Q_90), np.min(QY))
+        max_value = max(np.max(Q_90), np.max(QY))
+        
 
         fig1 = go.Figure()
         fig1.add_trace(go.Heatmap(z=QY_reordered, colorscale='gray', text=QY_reordered, hoverinfo='text', texttemplate="%{text}",
-                    textfont={"size":10}))
+                    textfont={"size":10}, zmin=min_value, zmax=max_value))
         fig1.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='Quantization Matrix Q_50', width=400, height=400)
 
         fig2 = go.Figure()
         fig2.add_trace(go.Heatmap(z=Q_90_reordered, colorscale='gray', text=Q_90_reordered, hoverinfo='text', texttemplate="%{text}",
-                    textfont={"size":10}))
+                    textfont={"size":10}, zmin=min_value, zmax=max_value))
         fig2.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='Quantization Matrix Q_90', width=400, height=400)
         st.write("### Quantization Matrices")
         col1, col2 = st.columns(2)
@@ -232,14 +236,17 @@ def color_image_jpeg(args):
         no_quant = idct(idct(coeff_dct_conv.T, norm='ortho').T, norm='ortho')
         dct_origin = blocks[0][0][:, :, 0]
         
+        min_value = min(np.min(dct_origin), np.min(no_quant))
+        max_value = max(np.max(dct_origin), np.max(no_quant))
+        
         fig1 = go.Figure()
         fig1.add_trace(go.Heatmap(z=dct_origin, colorscale='gray', text=dct_origin, hoverinfo='text', texttemplate="%{text}",
-                    textfont={"size":10}))
+                    textfont={"size":10}, zmin=min_value, zmax=max_value))
         fig1.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='DCT Original', width=400, height=400)
 
         fig2 = go.Figure()
         fig2.add_trace(go.Heatmap(z=no_quant, colorscale='gray', text=np.round(no_quant,0), hoverinfo='text', texttemplate="%{text}",
-                    textfont={"size":10}))
+                    textfont={"size":10}, zmin=min_value, zmax=max_value))
         fig2.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='DCT After Quantization and Recovery', width=400, height=400)
         st.write("### DCT")
         col1, col2 = st.columns(2)
