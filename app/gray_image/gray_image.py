@@ -16,11 +16,8 @@ from collections import Counter
 import time
 import cv2
 
-def myYcbcr2rgb(ycbcr):
-    return (ycbcr2rgb(ycbcr).clip(0,1)*255).astype(np.uint8)
-
 def toBlocks(img, xLen, yLen, h, w):
-    blocks = np.zeros((yLen,xLen,h,w,3),dtype=np.int16)
+    blocks = np.zeros((yLen,xLen,h,w),dtype=np.int16)
     for y in range(yLen):
         for x in range(xLen):
             blocks[y][x]=img[y*h:(y+1)*h,x*w:(x+1)*w]
@@ -28,22 +25,21 @@ def toBlocks(img, xLen, yLen, h, w):
 
 def dctOrDedctAllBlocks(blocks, yLen, xLen, h, w,type="dct"):
     f=dct if type=="dct" else idct
-    dedctBlocks = np.zeros((yLen,xLen,h,w,3))
+    dedctBlocks = np.zeros((yLen,xLen,h,w))
     for y in range(yLen):
         for x in range(xLen):
-            d = np.zeros((h,w,3))
-            for i in range(3):
-                block=blocks[y][x][:,:,i]
-                d[:,:,i]=f(f(block.T, norm = 'ortho').T, norm = 'ortho')
-                if (type!="dct"):
-                    d=d.round().astype(np.int16)
+            d      = np.zeros((h,w))
+            block  = blocks[y][x][:,:]
+            d[:,:] = f(f(block.T, norm = 'ortho').T, norm = 'ortho')
+            if (type!="dct"):
+                d=d.round().astype(np.int16)
             dedctBlocks[y][x]=d
     return dedctBlocks
 
 def blocks2img(blocks, xLen, yLen, h, w):
     W   = xLen*w
     H   = yLen*h
-    img = np.zeros((H,W,3))
+    img = np.zeros((H,W))
     for y in range(yLen):
         for x in range(xLen):
             img[y*h:y*h+h,x*w:x*w+w]=blocks[y][x]
@@ -112,13 +108,12 @@ def runLength2bytes(code):
     return bytes([len(code)%8]+[int(code[i:i+8],2) for i in range(0, len(code), 8)])
 
 def huffmanCounterWholeImg(blocks, xLen, yLen, h, w, bitBits, runBits, rbBits):
-    rbCount=np.zeros(xLen*yLen*3,dtype=Counter)
-    zz=np.zeros(xLen*yLen*3,dtype=object)
+    rbCount=np.zeros(xLen*yLen,dtype=Counter)
+    zz=np.zeros(xLen*yLen,dtype=object)
     for y in range(yLen):
         for x in range(xLen):
-            for i in range(3):
-                zz[y*xLen*3+x*3+i]=zigZag(blocks[y, x,:,:,i], h, w)
-                rbCount[y*xLen*3+x*3+i]=huffmanCounter(zz[y*xLen*3+x*3+i], bitBits, runBits, rbBits)
+            zz[y*xLen+x]=zigZag(blocks[y, x,:,:], h, w)
+            rbCount[y*xLen+x]=huffmanCounter(zz[y*xLen+x], bitBits, runBits, rbBits)
     return np.sum(rbCount),zz
 
 def bytes2runLength(bytes):
@@ -132,9 +127,8 @@ def savingQuantizedDctBlocks(blocks, xLen, yLen, h, w, img, useHuffman, bitBits,
     DC=0
     for y in range(yLen):
         for x in range(xLen):
-            for i in range(3):
-                codeNew,DC=runLength(zigZag[y*xLen*3+x*3+i],DC, bitBits, runBits, rbBits, hfm if useHuffman else None)
-                code+=codeNew
+            codeNew,DC=runLength(zigZag[y*xLen+x],DC, bitBits, runBits, rbBits, hfm if useHuffman else None)
+            code+=codeNew
     savedImg=runLength2bytes(code)
     st.write("Image original size:    %.3f MB"%(img.size/(2**20)))
     st.write("Compression image size: %.3f MB"%(len(savedImg)/2**20))
@@ -166,62 +160,53 @@ def loadingQuantizedDctBlocks(loadedbytes, runBits, bitBits, rbBits, h, w, zzLin
     xLen = int(format(loadedbytes[0], 'b') + format(loadedbytes[1], '08b')[:4], 2)
     yLen = int(format(loadedbytes[1], '08b')[4:] + format(loadedbytes[2], '08b'), 2)
     code = bytes2runLength(loadedbytes[3:])
-    blocks = np.zeros((yLen, xLen, h, w, 3), dtype=np.int16)
+    blocks = np.zeros((yLen, xLen, h, w), dtype=np.int16)
     lastDC = 0
     rbBitsTmp = rbBits
     rbTmp = ""
     cursor = 0  # don't use code=code[index:] to remove readed strings when len(String) is large like 1,000,000. It will be extremely slow
     for y in range(yLen):
         for x in range(xLen):
-            for i in range(3):
-                zz = np.zeros(64)
-                bitSize = int(code[cursor:cursor+bitBits], 2)
-                DC = code[cursor+bitBits:cursor+bitBits+bitSize]
-                DC = (int(DC, 2) if DC[0] == "1" else -int(''.join([str((int(b)^1)) for b in DC]), 2)) if bitSize > 0 else 0
-                cursor += (bitBits+bitSize)
-                zz[0] = DC+lastDC
-                lastDC = zz[0]
-                r = 1
-                while True:
-                    if sortedHfm is not None:
-                        for ii in sortedHfm:
-                            if ii[0] == code[cursor:cursor+len(ii[0])]:
-                                rbTmp = ii[1]
-                                rbBitsTmp = len(ii[0])
-                                break
-                        run=int(rbTmp[:runBits],2)
-                        bitSize=int(rbTmp[runBits:],2)
-                    else:
-                        run = int(code[cursor:cursor+runBits], 2)
-                        bitSize = int(code[cursor+runBits:cursor+rbBitsTmp], 2)
-                    if bitSize == 0:
-                        cursor += rbBitsTmp
-                        if run == runMax:
-                            r += (run+1)
-                            continue
-                        else:
+            zz = np.zeros(64)
+            bitSize = int(code[cursor:cursor+bitBits], 2)
+            DC = code[cursor+bitBits:cursor+bitBits+bitSize]
+            DC = (int(DC, 2) if DC[0] == "1" else -int(''.join([str((int(b)^1)) for b in DC]), 2)) if bitSize > 0 else 0
+            cursor += (bitBits+bitSize)
+            zz[0] = DC+lastDC
+            lastDC = zz[0]
+            r = 1
+            while True:
+                if sortedHfm is not None:
+                    for ii in sortedHfm:
+                        if ii[0] == code[cursor:cursor+len(ii[0])]:
+                            rbTmp = ii[1]
+                            rbBitsTmp = len(ii[0])
                             break
-                    coefficient = code[cursor+rbBitsTmp:cursor+rbBitsTmp+bitSize]
-                    if coefficient[0] == "0":
-                        coefficient = -int(''.join([str((int(b)^1)) for b in coefficient]), 2)
+                    run=int(rbTmp[:runBits],2)
+                    bitSize=int(rbTmp[runBits:],2)
+                else:
+                    run = int(code[cursor:cursor+runBits], 2)
+                    bitSize = int(code[cursor+runBits:cursor+rbBitsTmp], 2)
+                if bitSize == 0:
+                    cursor += rbBitsTmp
+                    if run == runMax:
+                        r += (run+1)
+                        continue
                     else:
-                        coefficient = int(coefficient, 2)
-                    zz[r+run] = coefficient
-                    r += (run+1)
-                    cursor += rbBitsTmp+bitSize
-                blocks[y, x, ..., i] = deZigZag2(zz, h, w, zzLine)
+                        break
+                coefficient = code[cursor+rbBitsTmp:cursor+rbBitsTmp+bitSize]
+                if coefficient[0] == "0":
+                    coefficient = -int(''.join([str((int(b)^1)) for b in coefficient]), 2)
+                else:
+                    coefficient = int(coefficient, 2)
+                zz[r+run] = coefficient
+                r += (run+1)
+                cursor += rbBitsTmp+bitSize
+            blocks[y, x, ...] = deZigZag2(zz, h, w, zzLine)
     return blocks
 
-#tính độ đo
-# MSE, RMSE, PSNR, SNR
-def MSE(img1, img2):
-    return ((img1.astype(float) - img2.astype(float)) ** 2).mean(axis=None)
-
-def PSNR(mse): 
-    return 10 * np.log(((255 * 255) / mse), 10)
-
-def color_image_jpeg(args):
-    st.title('Image Color Display App')
+def gray_image_jpeg(args):
+    st.title('Image Gray Display App')
 
     # upload and read image
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
@@ -247,6 +232,7 @@ def color_image_jpeg(args):
         img = img_raw[start_y:start_y + new_height, start_x:start_x + new_width, :]
     else:
         img = img_raw
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     originalImg = img.copy()
     
     # Config
@@ -258,80 +244,41 @@ def color_image_jpeg(args):
     runBits           = 1 # modify it if you want
     bitBits           = 3  # modify it if you want
     rbBits            = runBits+bitBits ##(run,bitSize of coefficient)
-    useYCbCr          = True #modify it if you want
     useHuffman        = True #modify it if you want
     quantizationRatio = 1 # modify it if you want, quantization table=default quantization table * quantizationRatio
     
     
     originalImg = copy(img) # copy image
-    ycbcr       = rgb2ycbcr(img) # change color space
-    if (useYCbCr):
-        img = ycbcr
         
     #Plot ảnh Original
-    fig_original = px.imshow(originalImg)
+    fig_original = px.imshow(originalImg, binary_string=True)
     fig_original.update_layout(title='Original Image')
-    # Plot ảnh YCbCr
-    fig_ycbcr = px.imshow(ycbcr.astype(np.uint8))
-    fig_ycbcr.update_layout(title='YCbCr Image')
     st.subheader('Original Image')
     st.plotly_chart(fig_original)
-    st.subheader('YCbCr Image')
-    st.plotly_chart(fig_ycbcr)
-    
-    #Hiển thị 3 kênh màu
-    fig_Y = px.imshow(ycbcr[:, :, 0], color_continuous_scale='gray')
-    fig_Y.update_layout(title='Y Channel')
-    fig_Cb = px.imshow(ycbcr[:, :, 1])
-    fig_Cb.update_layout(title='Cb Channel')
-    fig_Cr = px.imshow(ycbcr[:, :, 2])
-    fig_Cr.update_layout(title='Cr Channel')
-    st.write("### Y, Cb, and Cr Channels")
-    col1, col2, col3 = st.columns(3)
-    col1.plotly_chart(fig_Y, use_container_width=True)
-    col2.plotly_chart(fig_Cb, use_container_width=True)
-    col3.plotly_chart(fig_Cr, use_container_width=True)
     
     #  Hiển thị vị trí 0,0 của kênh Y, CB (khối gốc)
     blocks = toBlocks(img, xLen, yLen, h, w)
     selected_block = blocks[0][0]
-    Y_channel = selected_block[:, :, 0]
-    Cb_channel = selected_block[:, :, 1]
-    Cr_channel = selected_block[:, :, 2]
+    Y_channel = selected_block[:, :]
     fig_Y = px.imshow(Y_channel, color_continuous_scale='gray')
-    fig_Y.update_layout(title='Y Channel')
-    fig_Cb = px.imshow(Cb_channel)
-    fig_Cb.update_layout(title='Cb Channel')
-    fig_Cr = px.imshow(Cr_channel)
-    fig_Cr.update_layout(title='Cr Channel')
-    st.write("### Y, Cb, and Cr Channels block[0][0]")
-    col1, col2, col3 = st.columns(3)
-    col1.plotly_chart(fig_Y, use_container_width=True)
-    col2.plotly_chart(fig_Cb, use_container_width=True)
-    col3.plotly_chart(fig_Cr, use_container_width=True)
+    fig_Y.update_layout(title='Block 0 - 0')
+    st.subheader('Block 0 - 0 in Blocks Image')
+    st.plotly_chart(fig_Y)
     
     # DCT : Discrete Cosine Transform
     dctBlocks=dctOrDedctAllBlocks(blocks, yLen, xLen, h, w, "dct")
     # Hiển thị 3 kênh 2d block(0,0) sau khi dct
-    block_Y_dct = dctBlocks[0][0][:, :, 0]
-    block_Cb_dct = dctBlocks[0][0][:, :, 1]
-    block_Cr_dct = dctBlocks[0][0][:, :, 2]
-    fig_Y = px.imshow(block_Y_dct, color_continuous_scale='gray')
-    fig_Y.update_layout(title='Y Channel')
-    fig_Cb = px.imshow(block_Cb_dct)
-    fig_Cb.update_layout(title='Cb Channel')
-    fig_Cr = px.imshow(block_Cr_dct)
-    fig_Cr.update_layout(title='Cr Channel')
-    st.write("### Y, Cb, and Cr Channels block[0][0] after DCT")
-    col1, col2, col3 = st.columns(3)
-    col1.plotly_chart(fig_Y, use_container_width=True)
-    col2.plotly_chart(fig_Cb, use_container_width=True)
-    col3.plotly_chart(fig_Cr, use_container_width=True)
+    block_Y_dct = dctBlocks[0][0][:, :]
+    fig_Y_dct = px.imshow(block_Y_dct, color_continuous_scale='gray')
+    fig_Y_dct.update_layout(title='Block 0 - 0 after DCT')
+    st.subheader('Block 0 - 0 in Blocks Image after DCT')
+    st.plotly_chart(fig_Y_dct)
+    
     
     # Thêm widget slider để chọn vị trí
     x_pos = st.slider('Select x position', 0, dctBlocks.shape[1] - 1, 0)
     y_pos = st.slider('Select y position', 0, dctBlocks.shape[0] - 1, 0)
-    dct_Y = dctBlocks[x_pos][y_pos][:, :, 0] 
+    dct_Y = dctBlocks[x_pos][y_pos][:, :] 
     # Tạo meshgrid cho biểu đồ 3D
     x = np.arange(dct_Y.shape[0])
     y = np.arange(dct_Y.shape[1])
@@ -341,7 +288,7 @@ def color_image_jpeg(args):
     fig.update_layout(scene=dict(xaxis_title='Frequency (X-axis)',
                                 yaxis_title='Frequency (Y-axis)',
                                 zaxis_title='DCT Coefficient'),
-                    title=f'3D Surface of DCT at ({x_pos}, {y_pos}) - Y Channel')
+                    title=f'3D Surface of DCT at ({x_pos}, {y_pos})')
     st.plotly_chart(fig)
     
     # Lượng tử hóa
@@ -367,7 +314,7 @@ def color_image_jpeg(args):
     QY = QY[:w,:h]
     QC = QC[:w,:h]
     qDctBlocks = copy(dctBlocks)
-    Q3 = np.moveaxis(np.array([QY]+[QC]+[QC]),0,2)*quantizationRatio if useYCbCr else np.dstack([QY*quantizationRatio]*3)#all r-g-b/Y-Cb-Cr 3 channels need to be quantized
+    Q3 = np.dstack(QY*quantizationRatio)#all r-g-b/Y-Cb-Cr 3 channels need to be quantized
     Q3 = Q3*((11-w)/3)
     qDctBlocks = (qDctBlocks/Q3).round().astype('int16')
     
@@ -393,11 +340,11 @@ def color_image_jpeg(args):
     col2.plotly_chart(fig2, use_container_width=True)
     
     # Chia DCT / Quatization xong làm tròn thành số nguyên Hiển thị lên 
-    coeff_dct = dctBlocks[0][0][:, :, 0]  
+    coeff_dct = dctBlocks[0][0][:, :]  
     coeff_quant = np.round(coeff_dct / QY)
     coeff_dct_conv = coeff_quant * QY
     no_quant = idct(idct(coeff_dct_conv.T, norm='ortho').T, norm='ortho')
-    dct_origin = blocks[0][0][:, :, 0]
+    dct_origin = blocks[0][0][:, :]
     
     min_value = min(np.min(dct_origin), np.min(no_quant))
     max_value = max(np.max(dct_origin), np.max(no_quant))
@@ -417,22 +364,18 @@ def color_image_jpeg(args):
     # Zigzag
     st.write("### Zigzag")
     col1, col2 = st.columns(2)
-    col1.write(qDctBlocks[0][0][:,:,0])
-    col2.write(" ".join(list(zigZag(qDctBlocks[0][0][:,:,0], h, w).astype(np.str0))))
+    col1.write(qDctBlocks[0][0][:,:])
+    col2.write(" ".join(list(zigZag(qDctBlocks[0][0][:,:], h, w).astype(np.str0))))
     
     # RunLength
     st.write("### RunLength")
-    code1, DC = runLength(zigZag(qDctBlocks[0][0][:,:,0], h, w), 0, bitBits, runBits, rbBits)
-    code2, DC = runLength(zigZag(qDctBlocks[0][0][:,:,1], h, w), DC, bitBits, runBits, rbBits)
-    code3, DC = runLength(zigZag(qDctBlocks[0][0][:,:,2], h, w), DC, bitBits, runBits, rbBits)
-    codeBlock = code1 + code2 + code3
+    code1, _ = runLength(zigZag(qDctBlocks[0][0][:,:], h, w), 0, bitBits, runBits, rbBits)
+    codeBlock = code1
     st.write("\n".join(codeBlock) +"\nCompresion size of this block: " + str(len(codeBlock)/8) + "KB\nOriginal size of one block: " + str(w*h*3) + "KB")
     
     # Huffman
-    rbCount=np.zeros(3,dtype=Counter)
-    rbCount[0]=huffmanCounter(zigZag(qDctBlocks[0][0][:,:,0], h, w), bitBits, runBits, rbBits)
-    rbCount[1]=huffmanCounter(zigZag(qDctBlocks[0][0][:,:,1], h, w), bitBits, runBits, rbBits)
-    rbCount[2]=huffmanCounter(zigZag(qDctBlocks[0][0][:,:,2], h, w), bitBits, runBits, rbBits)
+    rbCount=np.zeros(1,dtype=Counter)
+    rbCount[0]=huffmanCounter(zigZag(qDctBlocks[0][0][:,:], h, w), bitBits, runBits, rbBits)
     rbCount=np.sum(rbCount)
     st.write("### Huffman")
     st.write("(run,bit) counter for Huffman Coding:\n"+str(rbCount))
@@ -453,7 +396,7 @@ def color_image_jpeg(args):
     locations=[[int(sum(range(gaps[i-1]+1))),sum(range(gaps[i]+1))] if gaps[i]>gaps[i-1]  else [64-sum(range(gaps[i-1])),64-sum(range(gaps[i]))] for i in range(len(gaps)-1)]
     
     #explaination of above section of codes
-    z=zigZag(qDctBlocks[0][0][:,:,0], h, w)
+    z=zigZag(qDctBlocks[0][0][:,:], h, w)
     gaps=[ i for i in range(1,w)]+[w-i for i in range(w)]+[-1]
     locations=[[int(sum(range(gaps[i-1]+1))),sum(range(gaps[i]+1))] if gaps[i]>gaps[i-1]  else [w*h-sum(range(gaps[i-1])),w*h-sum(range(gaps[i]))] for i in range(len(gaps)-1)]
     zz1=[z[l[0]:l[1]] for l in locations]
@@ -486,12 +429,10 @@ def color_image_jpeg(args):
     
     deDctLoadedBlocks=dctOrDedctAllBlocks(loadedBlocks*Q3, yLen, xLen, h, w ,"idct")
     loadedImg=blocks2img(deDctLoadedBlocks, xLen, yLen, h, w)
-    fig_1 = px.imshow(originalImg)
+    fig_1 = px.imshow(originalImg, binary_string=True)
     fig_1.update_layout(title='Image Original')
     
-    fig_2 = px.imshow(myYcbcr2rgb(loadedImg) 
-                        if useYCbCr else blocks2img(dctBlocks, xLen, yLen, h, w).astype(np.int16)
-                        )
+    fig_2 = px.imshow(loadedImg.astype(np.int16), binary_string=True)
     fig_2.update_layout(title='Image Decompress')
     
     st.write("### Compare")
