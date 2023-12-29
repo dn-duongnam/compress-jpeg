@@ -6,6 +6,7 @@ from skimage import io
 from io import BytesIO
 import plotly.express as px
 from skimage.color import rgb2ycbcr,ycbcr2rgb
+from itertools import groupby
 from scipy.fftpack import dct,idct
 from copy import copy
 import plotly.figure_factory as ff
@@ -60,6 +61,30 @@ def zigZag(block, h, w):
                 lines[i].append(block[y][x])
     return np.array([coefficient for line in lines for coefficient in line])
 
+def encodeRLE(x):
+    where = np.flatnonzero
+    x = np.asarray(x)
+    n = len(x)
+    if n == 0:
+        return (np.array([], dtype=int), 
+                np.array([], dtype=int), 
+                np.array([], dtype=x.dtype))
+
+    starts = np.r_[0, where(~np.isclose(x[1:], x[:-1], equal_nan=True)) + 1]
+    lengths = np.diff(np.r_[starts, n])
+    values = x[starts]
+    
+    return "".join([str(values[i]) + str(lengths[i]) for i in range(len(lengths))])
+
+# Đoạn code này nhận vào một mảng zigzag của các giá trị DCT 
+# (biến đổi cosin rời rạc) của một khối ảnh 8x8, giá trị DC 
+# trước đó, số bit để biểu diễn kích thước của các giá trị 
+# DC và AC, số bit để biểu diễn số lượng các giá trị AC 
+# bằng 0 liên tiếp, số bit để biểu diễn cặp run/size 
+# của các giá trị AC khác 0, và một bảng mã hóa Huffman 
+# tùy chọn. Đoạn code này trả về một chuỗi bit là kết quả 
+# của việc lượng tử hóa, mã hóa run-length, và mã hóa Huffman 
+# các giá trị DCT, cùng với giá trị DC mới
 def runLength(zigZagArr, lastDC, bitBits, runBits, rbBits, hfm=None):
     run=0
     newDC=min(zigZagArr[0],2**(2**bitBits-1))
@@ -450,9 +475,8 @@ def color_image_jpeg(args):
     
     # Zigzag
     st.write("### Zigzag")
-    col1, col2 = st.columns(2)
-    col1.write(qDctBlocks[0][0][:,:,0])
-    col2.write(" ".join(list(zigZag(qDctBlocks[0][0][:,:,0], h, w).astype(np.str0))))
+    st.write(qDctBlocks[0][0][:,:,0])
+    st.write(" ".join(list(zigZag(qDctBlocks[0][0][:,:,0], h, w).astype(np.str0))))
     
     # RunLength
     st.write("### RunLength")
@@ -460,7 +484,10 @@ def color_image_jpeg(args):
     code2, DC = runLength(zigZag(qDctBlocks[0][0][:,:,1], h, w), DC, bitBits, runBits, rbBits)
     code3, DC = runLength(zigZag(qDctBlocks[0][0][:,:,2], h, w), DC, bitBits, runBits, rbBits)
     codeBlock = code1 + code2 + code3
-    st.write("\n".join(codeBlock) +"\nCompresion size of this block: " + str(len(codeBlock)/8) + "KB\nOriginal size of one block: " + str(w*h*3) + "KB")
+    st.write(encodeRLE(zigZag(qDctBlocks[0][0][:,:,0], h, w).flatten()))
+    st.write(codeBlock)
+    st.write("Compresion size of this block: " + str(len(codeBlock)/8) + "KB")
+    st.write("Original size of one block: " + str(w*h*3) + "KB")
     
     # Huffman
     rbCount=np.zeros(3,dtype=Counter)

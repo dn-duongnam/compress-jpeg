@@ -56,6 +56,21 @@ def zigZag(block, h, w):
                 lines[i].append(block[y][x])
     return np.array([coefficient for line in lines for coefficient in line])
 
+def encodeRLE(x):
+    where = np.flatnonzero
+    x = np.asarray(x)
+    n = len(x)
+    if n == 0:
+        return (np.array([], dtype=int), 
+                np.array([], dtype=int), 
+                np.array([], dtype=x.dtype))
+
+    starts = np.r_[0, where(~np.isclose(x[1:], x[:-1], equal_nan=True)) + 1]
+    lengths = np.diff(np.r_[starts, n])
+    values = x[starts]
+    
+    return "".join([str(values[i]) + str(lengths[i]) for i in range(len(lengths))])
+
 def runLength(zigZagArr, lastDC, bitBits, runBits, rbBits, hfm=None):
     run=0
     newDC=min(zigZagArr[0],2**(2**bitBits-1))
@@ -343,6 +358,24 @@ def gray_image_jpeg(args):
     col2.plotly_chart(fig2, use_container_width=True)
     
     # Chia DCT / Quatization xong làm tròn thành số nguyên Hiển thị lên 
+    coeff_dct = dctBlocks[0][0][:, :]
+    coeff_quant = np.round(coeff_dct / QYquality)
+    min_value = min(np.min(coeff_dct), np.min(coeff_quant))
+    max_value = max(np.max(coeff_dct), np.max(coeff_quant))
+    fig1 = go.Figure()
+    fig1.add_trace(go.Heatmap(z=np.flipud(coeff_dct), colorscale='gray', text=np.round(np.flipud(coeff_dct),2), hoverinfo='text', texttemplate="%{text}",
+                textfont={"size":10}, zmin=min_value, zmax=max_value))
+    fig1.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='DCT Original', width=400, height=400)
+    fig2 = go.Figure()
+    fig2.add_trace(go.Heatmap(z=np.flipud(coeff_quant), colorscale='gray', text=np.round(np.flipud(coeff_quant),0), hoverinfo='text', texttemplate="%{text}",
+                textfont={"size":10}, zmin=min_value, zmax=max_value))
+    fig2.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='DCT After Quantization', width=400, height=400)
+    st.write("### DCT and Quantization")
+    col1, col2 = st.columns(2)
+    col1.plotly_chart(fig1, use_container_width=True)
+    col2.plotly_chart(fig2, use_container_width=True)
+    
+    # Chia DCT / Quatization xong làm tròn thành số nguyên Hiển thị lên 
     coeff_dct = dctBlocks[0][0][:, :]  
     coeff_quant = np.round(coeff_dct / QYquality)
     coeff_dct_conv = coeff_quant * QYquality
@@ -366,15 +399,17 @@ def gray_image_jpeg(args):
     
     # Zigzag
     st.write("### Zigzag")
-    col1, col2 = st.columns(2)
-    col1.write(qDctBlocks[0][0][:,:])
-    col2.write(" ".join(list(zigZag(qDctBlocks[0][0][:,:], h, w).astype(np.str0))))
+    st.write(qDctBlocks[0][0][:,:])
+    st.write(" ".join(list(zigZag(qDctBlocks[0][0][:,:], h, w).astype(np.str0))))
     
     # RunLength
     st.write("### RunLength")
     code1, _ = runLength(zigZag(qDctBlocks[0][0][:,:], h, w), 0, bitBits, runBits, rbBits)
     codeBlock = code1
-    st.write("\n".join(codeBlock) +"\nCompresion size of this block: " + str(len(codeBlock)/8) + "KB\nOriginal size of one block: " + str(w*h*3) + "KB")
+    st.write(encodeRLE(zigZag(qDctBlocks[0][0][:,:], h, w).flatten()))
+    st.write(codeBlock)
+    st.write("Compresion size of this block: " + str(len(codeBlock)/8) + "KB")
+    st.write("Original size of one block: " + str(w*h*3) + "KB")
     
     # Huffman
     rbCount=np.zeros(1,dtype=Counter)
