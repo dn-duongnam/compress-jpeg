@@ -46,15 +46,15 @@ def blocks2img(blocks, xLen, yLen, h, w):
     return img
 
 def zigZag(block, h, w):
-            lines=[[] for i in range(h+w-1)]
-            for y in range(h):
-                for x in range(w):
-                    i=y+x
-                    if(i%2 ==0):
-                        lines[i].insert(0,block[y][x])
-                    else:
-                        lines[i].append(block[y][x])
-            return np.array([coefficient for line in lines for coefficient in line])
+    lines=[[] for i in range(h+w-1)]
+    for y in range(h):
+        for x in range(w):
+            i=y+x
+            if(i%2 ==0):
+                lines[i].insert(0,block[y][x])
+            else:
+                lines[i].append(block[y][x])
+    return np.array([coefficient for line in lines for coefficient in line])
 
 def runLength(zigZagArr, lastDC, bitBits, runBits, rbBits, hfm=None):
     run=0
@@ -210,6 +210,8 @@ def gray_image_jpeg(args):
 
     # upload and read image
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
+    quality = st.text_input('Quality Compressed: ', '90')
+    quality = int(quality.strip())
     if uploaded_file is None: # catch error
         return ""
     file_bytes = uploaded_file.getvalue()
@@ -311,17 +313,18 @@ def gray_image_jpeg(args):
         [99,99,99,99,99,99,99,99],
         [99,99,99,99,99,99,99,99],
         [99,99,99,99,99,99,99,99]])
-    QY = QY[:w,:h]
+    alpha = (100 - quality) / 50
+    alpha = alpha
+    QYquality = np.floor(QY * alpha + 0.5) if alpha != 0 else np.ceil(QY * alpha + 0.5)
+    QYquality = QYquality[:w,:h]
     QC = QC[:w,:h]
     qDctBlocks = copy(dctBlocks)
-    Q3 = np.dstack(QY*quantizationRatio)#all r-g-b/Y-Cb-Cr 3 channels need to be quantized
+    Q3 = np.dstack(QYquality*quantizationRatio)#all r-g-b/Y-Cb-Cr 3 channels need to be quantized
     Q3 = Q3*((11-w)/3)
     qDctBlocks = (qDctBlocks/Q3).round().astype('int16')
     
-    quality = 90
-    alpha = (100 - quality) / 50
-    alpha = 1 if alpha == 0 else alpha
-    Q_90 = np.floor(QY * alpha + 0.5)
+    
+    Q_90 = np.floor(QY * alpha + 0.5) if alpha != 0 else np.ceil(QY * alpha + 0.5)
     QY_reordered = np.flipud(QY)
     Q_90_reordered = np.flipud(Q_90)
     min_value = min(np.min(Q_90), np.min(QY))
@@ -333,7 +336,7 @@ def gray_image_jpeg(args):
     fig2 = go.Figure()
     fig2.add_trace(go.Heatmap(z=Q_90_reordered, colorscale='gray', text=Q_90_reordered, hoverinfo='text', texttemplate="%{text}",
                 textfont={"size":10}, zmin=min_value, zmax=max_value))
-    fig2.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='Quantization Matrix Q_90', width=400, height=400)
+    fig2.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title=f'Quantization Matrix Q_{quality}', width=400, height=400)
     st.write("### Quantization Matrices")
     col1, col2 = st.columns(2)
     col1.plotly_chart(fig1, use_container_width=True)
@@ -341,19 +344,19 @@ def gray_image_jpeg(args):
     
     # Chia DCT / Quatization xong làm tròn thành số nguyên Hiển thị lên 
     coeff_dct = dctBlocks[0][0][:, :]  
-    coeff_quant = np.round(coeff_dct / QY)
-    coeff_dct_conv = coeff_quant * QY
+    coeff_quant = np.round(coeff_dct / QYquality)
+    coeff_dct_conv = coeff_quant * QYquality
     no_quant = idct(idct(coeff_dct_conv.T, norm='ortho').T, norm='ortho')
     dct_origin = blocks[0][0][:, :]
     
     min_value = min(np.min(dct_origin), np.min(no_quant))
     max_value = max(np.max(dct_origin), np.max(no_quant))
     fig1 = go.Figure()
-    fig1.add_trace(go.Heatmap(z=dct_origin, colorscale='gray', text=dct_origin, hoverinfo='text', texttemplate="%{text}",
+    fig1.add_trace(go.Heatmap(z=np.flipud(dct_origin), colorscale='gray', text=np.flipud(dct_origin), hoverinfo='text', texttemplate="%{text}",
                 textfont={"size":10}, zmin=min_value, zmax=max_value))
     fig1.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='DCT Original', width=400, height=400)
     fig2 = go.Figure()
-    fig2.add_trace(go.Heatmap(z=no_quant, colorscale='gray', text=np.round(no_quant,0), hoverinfo='text', texttemplate="%{text}",
+    fig2.add_trace(go.Heatmap(z=np.flipud(no_quant), colorscale='gray', text=np.round(np.flipud(no_quant),0), hoverinfo='text', texttemplate="%{text}",
                 textfont={"size":10}, zmin=min_value, zmax=max_value))
     fig2.update_layout(xaxis_title='X-axis', yaxis_title='Y-axis', title='DCT After Quantization and Recovery', width=400, height=400)
     st.write("### DCT")
@@ -427,7 +430,7 @@ def gray_image_jpeg(args):
     st.write("### Decompress")
     st.write("Decoding: " + str(t2-t1) + " seconds")
     
-    deDctLoadedBlocks=dctOrDedctAllBlocks(loadedBlocks*Q3, yLen, xLen, h, w ,"idct")
+    deDctLoadedBlocks=dctOrDedctAllBlocks(qDctBlocks*Q3, yLen, xLen, h, w ,"idct")
     loadedImg=blocks2img(deDctLoadedBlocks, xLen, yLen, h, w)
     fig_1 = px.imshow(originalImg, binary_string=True)
     fig_1.update_layout(title='Image Original')
