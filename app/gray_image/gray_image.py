@@ -214,6 +214,7 @@ def loadingQuantizedDctBlocks(loadedbytes, runBits, bitBits, rbBits, h, w, zzLin
                     coefficient = -int(''.join([str((int(b)^1)) for b in coefficient]), 2)
                 else:
                     coefficient = int(coefficient, 2)
+                if (r + run >= 64): break
                 zz[r+run] = coefficient
                 r += (run+1)
                 cursor += rbBitsTmp+bitSize
@@ -459,11 +460,11 @@ def gray_image_jpeg(args):
     loadedbytes = load.read()
     code=bytes2runLength(loadedbytes[2:])
     
-    t1 = time.time()
-    loadedBlocks = loadingQuantizedDctBlocks(loadedbytes, runBits, bitBits, rbBits, h, w, zzLine, sortedHfmForDecode if useHuffman else None)
-    t2 = time.time()
-    st.write("### Decompress")
-    st.write("Decoding: " + str(t2-t1) + " seconds")
+    # t1 = time.time()
+    # # loadedBlocks = loadingQuantizedDctBlocks(loadedbytes, runBits, bitBits, rbBits, h, w, zzLine, sortedHfmForDecode if useHuffman else None)
+    # t2 = time.time()
+    # st.write("### Decompress")
+    # st.write("Decoding: " + str(t2-t1) + " seconds")
     
     deDctLoadedBlocks=dctOrDedctAllBlocks(qDctBlocks*Q3, yLen, xLen, h, w ,"idct")
     loadedImg=blocks2img(deDctLoadedBlocks, xLen, yLen, h, w)
