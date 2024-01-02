@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import rawpy
 import numpy as np
-from skimage import io
+from skimage import io, metrics
 from io import BytesIO
 import plotly.express as px
 from skimage.color import rgb2ycbcr,ycbcr2rgb
@@ -470,11 +470,19 @@ def gray_image_jpeg(args):
     loadedImg=blocks2img(deDctLoadedBlocks, xLen, yLen, h, w)
     fig_1 = px.imshow(originalImg, binary_string=True)
     fig_1.update_layout(title='Image Original')
-    
-    fig_2 = px.imshow(loadedImg.astype(np.int16), binary_string=True)
+    loadedImg = np.clip(loadedImg, 0, 255).astype(np.uint8)
+    fig_2 = px.imshow(loadedImg, binary_string=True)
     fig_2.update_layout(title='Image Decompress')
     
     st.write("### Compare")
     col1, col2 = st.columns(2)
     col1.plotly_chart(fig_1, use_container_width=True)
     col2.plotly_chart(fig_2, use_container_width=True)
+    
+    psnr_value = metrics.peak_signal_noise_ratio(loadedImg, originalImg)
+    mse_value = metrics.mean_squared_error(loadedImg, originalImg)
+    ssim_value = metrics.structural_similarity(loadedImg, originalImg, win_size = 3)
+            
+    st.write(f"### Image Quality {quality} Metrics")
+    table_data = {"Type Image":["Decompress Image"],"PSNR": [psnr_value], "MSE": [mse_value], "SSIM": [ssim_value]}
+    table = st.table(table_data)

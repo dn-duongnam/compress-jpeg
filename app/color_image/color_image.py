@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import rawpy
 import numpy as np
-from skimage import io
+from skimage import io, metrics
 from io import BytesIO
 import plotly.express as px
 from skimage.color import rgb2ycbcr,ycbcr2rgb
@@ -10,7 +10,6 @@ from itertools import groupby
 from scipy.fftpack import dct,idct
 from copy import copy
 import plotly.figure_factory as ff
-from scipy.fftpack import dct,idct
 import plotly.graph_objects as go
 import huffman
 from collections import Counter
@@ -559,3 +558,14 @@ def color_image_jpeg(args):
     col1, col2 = st.columns(2)
     col1.plotly_chart(fig_1, use_container_width=True)
     col2.plotly_chart(fig_2, use_container_width=True)
+    
+    psnr_value = metrics.peak_signal_noise_ratio(myYcbcr2rgb(loadedImg) 
+                        if useYCbCr else blocks2img(dctBlocks, xLen, yLen, h, w).astype(np.int16), originalImg)
+    mse_value = metrics.mean_squared_error(myYcbcr2rgb(loadedImg) 
+                        if useYCbCr else blocks2img(dctBlocks, xLen, yLen, h, w).astype(np.int16), originalImg)
+    ssim_value = metrics.structural_similarity(myYcbcr2rgb(loadedImg) 
+                        if useYCbCr else blocks2img(dctBlocks, xLen, yLen, h, w).astype(np.int16), originalImg, win_size = 3)
+            
+    st.write(f"### Image Quality {quality} Metrics")
+    table_data = {"Type Image":["Decompress Image"],"PSNR": [psnr_value], "MSE": [mse_value], "SSIM": [ssim_value]}
+    table = st.table(table_data)
