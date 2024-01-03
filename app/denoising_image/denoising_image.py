@@ -167,7 +167,8 @@ def denoising_image(args):
         fig_original = px.imshow(patches_dct_ori[0,:, :, 0])
         fig_original.update_traces(text=np.round(patches_dct_ori[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         st.subheader('Original Noise Image DCT')
         st.plotly_chart(fig_original)
         
@@ -175,7 +176,8 @@ def denoising_image(args):
         fig_original = px.imshow(patches_th[0,:, :, 0])
         fig_original.update_traces(text=np.round(patches_th[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         st.subheader('Original Noise Image DCT After Threshold')
         st.plotly_chart(fig_original)
     else:      
@@ -200,31 +202,35 @@ def denoising_image(args):
         fig_1.update_layout(title="Original Image DCT")
         fig_1.update_traces(text=np.round(patches_dct_ori[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         
         fig_2 = px.imshow(patches_dct_noise[0,:, :, 0])
         fig_2.update_layout(title="Noisy Image DCT")
         fig_2.update_traces(text=np.round(patches_dct_noise[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         
         st.write("### Compare DCT")
         col1, col2 = st.columns(2)
-        col1.plotly_chart(fig_2, use_container_width=True)
-        col2.plotly_chart(fig_1, use_container_width=True)
+        col1.plotly_chart(fig_1, use_container_width=True)
+        col2.plotly_chart(fig_2, use_container_width=True)
         
         patches_noise_th = np.where(patches_dct_ori < threshold, 0, patches_dct_ori)
         fig_1 = px.imshow(patches_dct_ori[0,:, :, 0])
         fig_1.update_layout(title="Original Image DCT")
         fig_1.update_traces(text=np.round(patches_dct_ori[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         
         fig_2 = px.imshow(patches_dct_noise[0,:, :, 0])
         fig_2.update_layout(title="Noisy Image DCT After Threshold")
         fig_2.update_traces(text=np.round(patches_noise_th[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         st.write("### Compare DCT")
         col1, col2 = st.columns(2)
         col1.plotly_chart(fig_1, use_container_width=True)
