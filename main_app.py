@@ -6,4 +6,5 @@ if __name__ == '__main__':
     app.add_app('Color Image Jpeg',color_image_jpeg)
     app.add_app('Gray Image Jpeg',gray_image_jpeg)
     app.add_app("Denoising Image", denoising_image)
+    app.add_app("Denoising Periodic", denoising_periodic)
     app.run()
