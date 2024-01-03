@@ -12,28 +12,51 @@ from scipy.ndimage import gaussian_filter
 from skimage import io, metrics
 import pandas as pd
 
+
+DCTbasis3x3 = np.array([
+    [   0.5773502588272094726562500000000000000000,
+        0.5773502588272094726562500000000000000000,
+        0.5773502588272094726562500000000000000000,     ],
+    [  0.7071067690849304199218750000000000000000,
+      0.0000000000000000000000000000000000000000,
+      -0.7071067690849304199218750000000000000000, ],
+    [
+        0.4082483053207397460937500000000000000000,
+        -0.8164966106414794921875000000000000000000,
+        0.4082483053207397460937500000000000000000      ]
+])
+
+def ColorTransform(img, DCTbasis3x3, flag=1):
+    image_flat = img.reshape(-1, 3)
+    if flag == 1:
+        transformed_image_flat = np.dot(image_flat, DCTbasis3x3.T)
+    else:
+        transformed_image_flat = np.dot(image_flat, DCTbasis3x3)
+    transformed_image_flat = transformed_image_flat.reshape(img.shape)
+    return transformed_image_flat
+
 def image2Patches(img, size_patch, stride):
     h, w = img.shape[0:2]
     w_h, w_w = size_patch,size_patch
     s_h, s_w = stride, stride
     starting_points = [(x, y)  for x in set( list(range(0, h - w_h, s_h)) + [h - w_h] ) 
                                 for y in set( list(range(0, w - w_w, s_w)) + [w - w_w] )]
-    patches = np.empty((len(starting_points), w_h, w_w), dtype='float64')
+    patches = np.empty((len(starting_points), w_h, w_w, 3), dtype='float64')
     for i, (x, y) in enumerate(starting_points):
-        patches[i] = img[x:x + w_h, y:y + w_w]
+        patches[i] = img[x:x + w_h, y:y + w_w, :]
     return patches
 
 def sliding_window_denoising(img, size_patch, stride, threshold):
     h, w = img.shape[0:2]
     w_h, w_w = size_patch,size_patch
     s_h, s_w = stride, stride
-    result = np.zeros((h, w), dtype='float64')
-    overlap = np.zeros((h, w), dtype='float64')
+    result = np.zeros((*img.shape[:-1], 3), dtype='float64')
+    overlap = np.zeros((*img.shape[:-1], 3), dtype='float64')
     starting_points = [(x, y)  for x in set( list(range(0, h - w_h, s_h)) + [h - w_h] ) 
                                 for y in set( list(range(0, w - w_w, s_w)) + [w - w_w] )]
-    patches = np.empty((len(starting_points), w_h, w_w), dtype='float64')
+    patches = np.empty((len(starting_points), w_h, w_w, 3), dtype='float64')
     for i, (x, y) in enumerate(starting_points):
-        patches[i] = img[x:x + w_h, y:y + w_w]
+        patches[i] = img[x:x + w_h, y:y + w_w, :]
 
     patches_dct = dct(dct(patches, axis=1, norm='ortho'), axis=2, norm='ortho')
     patches_th = np.where(np.abs(patches_dct) < threshold, 0, patches_dct)
@@ -41,8 +64,8 @@ def sliding_window_denoising(img, size_patch, stride, threshold):
         
     for i in range(len(patches)):
         x, y = starting_points[i]
-        result[x:x + w_h, y:y + w_w] += patches_th[i]
-        overlap[x:x + w_h, y:y + w_w] += 1
+        result[x:x + w_h, y:y + w_w, :] += patches_th[i]
+        overlap[x:x + w_h, y:y + w_w, :] += 1
 
     assert np.sum(overlap == 0.) == 0, "Sliding window does not cover all volume"
 
@@ -67,8 +90,8 @@ def add_poisson_noise(image, scale_factor):
 def addSpeckleNoise(img, intensity=0.5):
     image = img.copy()
     # Generate speckle noise
-    row, col = image.shape
-    speckle = intensity * np.random.randn(row, col)
+    row, col, c = image.shape
+    speckle = intensity * np.random.randn(row, col, c)
     
     # Add the noise to the image
     noisy = image + image * speckle
@@ -81,7 +104,7 @@ def addSpeckleNoise(img, intensity=0.5):
     
     return noisy
 
-def denoising_image_gray(args):
+def denoising_image(args):
     st.title('Image Color Display App')
     # upload and read image
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
@@ -116,12 +139,10 @@ def denoising_image_gray(args):
     else:
         img = img_raw
         
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    
     if noise == "Gaussian":
-        rows, cols = img.shape
+        rows, cols, channels = img.shape
         mean = 0
-        noise_val = np.random.normal(mean, sigma, (rows, cols))
+        noise_val = np.random.normal(mean, sigma, (rows, cols, channels))
         noisy_image = np.clip(img + noise_val, 0, 255).astype(np.uint8)
     elif noise == "Salt and Pepper":
         salt_prob, pepper_prob = sigma / 1000, sigma / 1000
@@ -135,31 +156,33 @@ def denoising_image_gray(args):
         noisy_image = img
 
     if noise == "None":
-        fig_original = px.imshow(noisy_image, binary_string=True)
+        fig_original = px.imshow(noisy_image)
         st.subheader('Original Noise Image')
         st.plotly_chart(fig_original)
         
         image_patch = image2Patches(noisy_image, size_block, stride)
         patches_dct_ori = dct(dct(image_patch, axis=1, norm='ortho'), axis=2, norm='ortho')
-        fig_original = px.imshow(patches_dct_ori[0,:, :])
-        fig_original.update_traces(text=np.round(patches_dct_ori[0,:, :], 2),
+        fig_original = px.imshow(patches_dct_ori[0,:, :, 0])
+        fig_original.update_traces(text=np.round(patches_dct_ori[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         st.subheader('Original Noise Image DCT')
         st.plotly_chart(fig_original)
         
         patches_th = np.where(patches_dct_ori < threshold, 0, patches_dct_ori)
-        fig_original = px.imshow(patches_th[0,:, :])
-        fig_original.update_traces(text=np.round(patches_th[0,:, :], 2),
+        fig_original = px.imshow(patches_th[0,:, :, 0])
+        fig_original.update_traces(text=np.round(patches_th[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}")
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         st.subheader('Original Noise Image DCT After Threshold')
         st.plotly_chart(fig_original)
     else:      
-        fig_1 = px.imshow(noisy_image, binary_string=True)
+        fig_1 = px.imshow(noisy_image)
         fig_1.update_layout(title=f'Image Noisy {noise}')
         
-        fig_2 = px.imshow(img, binary_string=True)
+        fig_2 = px.imshow(img)
         fig_2.update_layout(title='Image Original')
         
         st.write("### Compare")
@@ -173,17 +196,19 @@ def denoising_image_gray(args):
         noise_patch = image2Patches(noisy_image, size_block, stride)
         patches_dct_noise = dct(dct(noise_patch, axis=1, norm='ortho'), axis=2, norm='ortho')
     
-        fig_1 = px.imshow(patches_dct_ori[0,:, :])
+        fig_1 = px.imshow(patches_dct_ori[0,:, :, 0])
         fig_1.update_layout(title="Original Image DCT")
-        fig_1.update_traces(text=np.round(patches_dct_ori[0,:, :], 2),
+        fig_1.update_traces(text=np.round(patches_dct_ori[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}",textfont={"size":8})
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         
-        fig_2 = px.imshow(patches_dct_noise[0,:, :])
+        fig_2 = px.imshow(patches_dct_noise[0,:, :, 0])
         fig_2.update_layout(title="Noisy Image DCT")
-        fig_2.update_traces(text=np.round(patches_dct_noise[0,:, :], 2),
+        fig_2.update_traces(text=np.round(patches_dct_noise[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}",textfont={"size":8})
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         
         st.write("### Compare DCT")
         col1, col2 = st.columns(2)
@@ -191,23 +216,27 @@ def denoising_image_gray(args):
         col2.plotly_chart(fig_2, use_container_width=True)
         
         patches_noise_th = np.where(patches_dct_ori < threshold, 0, patches_dct_ori)
-        fig_1 = px.imshow(patches_dct_ori[0,:, :])
+        fig_1 = px.imshow(patches_dct_ori[0,:, :, 0])
         fig_1.update_layout(title="Original Image DCT")
-        fig_1.update_traces(text=np.round(patches_dct_ori[0,:, :], 2),
+        fig_1.update_traces(text=np.round(patches_dct_ori[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}",textfont={"size":8})
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         
-        fig_2 = px.imshow(patches_noise_th[0,:, :])
+        fig_2 = px.imshow(patches_noise_th[0,:, :, 0])
         fig_2.update_layout(title="Noisy Image DCT After Threshold")
-        fig_2.update_traces(text=np.round(patches_noise_th[0,:, :], 2),
+        fig_2.update_traces(text=np.round(patches_noise_th[0,:, :, 0], 2),
                     hoverinfo='text',
-                    texttemplate="%{text}",textfont={"size":8})
+                    texttemplate="%{text}",
+                    textfont={"size": 8})
         st.write("### Compare DCT")
         col1, col2 = st.columns(2)
         col1.plotly_chart(fig_1, use_container_width=True)
         col2.plotly_chart(fig_2, use_container_width=True)
         
-    newImg = sliding_window_denoising(noisy_image, size_block, stride, threshold)
+    image_trans = ColorTransform(noisy_image, DCTbasis3x3, flag=1)
+    newImg = sliding_window_denoising(image_trans, size_block, stride, threshold)
+    newImg = ColorTransform(newImg, DCTbasis3x3, flag=-1)
     newImg = np.clip(newImg, 0, 255).astype(np.uint8)
     
     if noise == "None":
@@ -247,9 +276,9 @@ def denoising_image_gray(args):
         col1.plotly_chart(fig_1, use_container_width=True)
         col2.plotly_chart(fig_3, use_container_width=True)
     
-    fig_1 = px.imshow(noisy_image, binary_string=True)
+    fig_1 = px.imshow(noisy_image)
     fig_1.update_layout(title=f'Image Noisy {noise}')
-    fig_2 = px.imshow(newImg, binary_string=True)
+    fig_2 = px.imshow(newImg)
     fig_2.update_layout(title='Image Denoising')
     
     st.write("### Compare")
@@ -257,9 +286,9 @@ def denoising_image_gray(args):
     col1.plotly_chart(fig_1, use_container_width=True)
     col2.plotly_chart(fig_2, use_container_width=True)
     
-    fig_1 = px.imshow(img, binary_string=True)
+    fig_1 = px.imshow(img)
     fig_1.update_layout(title=f'Original Image')
-    fig_2 = px.imshow(newImg, binary_string=True)
+    fig_2 = px.imshow(newImg)
     fig_2.update_layout(title='Image Denoising')
     
     st.write("### Compare Original")
@@ -278,9 +307,9 @@ def denoising_image_gray(args):
     
     else:
     
-        psnr_value_noise = metrics.peak_signal_noise_ratio(img, noisy_image)
-        mse_value_noise = metrics.mean_squared_error(img, noisy_image)
-        ssim_value_noise = metrics.structural_similarity(img, noisy_image, win_size=3)
+        psnr_value_noise = metrics.peak_signal_noise_ratio(noisy_image, newImg)
+        mse_value_noise = metrics.mean_squared_error(noisy_image, newImg)
+        ssim_value_noise = metrics.structural_similarity(noisy_image, newImg, win_size=3)
             
         # st.write(f"### Image Quality Metrics  (Size Block={size_block}, Noise={noise}, Sigma={sigma}, Threshold={threshold}, Stride={stride})")
         # table_data = {"PSNR": [psnr_value], "MSE": [mse_value], "SSIM": [ssim_value]}

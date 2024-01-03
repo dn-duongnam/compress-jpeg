@@ -24,14 +24,15 @@ DCTbasis3x3 = np.array([
         0.4082483053207397460937500000000000000000,
         -0.8164966106414794921875000000000000000000,
         0.4082483053207397460937500000000000000000      ]
-])
+], dtype=np.float32)
 
 def ColorTransform(img, DCTbasis3x3, flag=1):
-    image_flat = img.reshape(-1, 3)
+    img_cp = img.copy().astype(np.float32)
+    image_flat = img_cp.reshape(-1, 3)
     if flag == 1:
         transformed_image_flat = np.dot(image_flat, DCTbasis3x3.T)
     else:
-        transformed_image_flat = np.dot(image_flat, DCTbasis3x3)
+        transformed_image_flat = np.dot(image_flat, np.linalg.inv(DCTbasis3x3.T))
     transformed_image_flat = transformed_image_flat.reshape(img.shape)
     return transformed_image_flat
 
@@ -59,7 +60,7 @@ def sliding_window_denoising(img, size_patch, stride, threshold):
         patches[i] = img[x:x + w_h, y:y + w_w, :]
 
     patches_dct = dct(dct(patches, axis=1, norm='ortho'), axis=2, norm='ortho')
-    patches_th = np.where(patches_dct < threshold, 0, patches_dct)
+    patches_th = np.where(np.abs(patches_dct) < threshold, 0, patches_dct)
     patches_th = idct(idct(patches_th, axis=1, norm='ortho'), axis=2, norm='ortho')
         
     for i in range(len(patches)):
@@ -69,7 +70,7 @@ def sliding_window_denoising(img, size_patch, stride, threshold):
 
     assert np.sum(overlap == 0.) == 0, "Sliding window does not cover all volume"
 
-    return np.clip(result / overlap, 0, 255).astype(np.uint8)
+    return np.clip((result / overlap), 0, 255).astype(np.uint8)
 
 def add_salt_and_pepper_noise(image, salt_prob, pepper_prob):
     noisy_image = np.copy(image)
@@ -170,7 +171,7 @@ def denoising_image(args):
         st.subheader('Original Noise Image DCT')
         st.plotly_chart(fig_original)
         
-        patches_th = np.where(patches_dct_ori < threshold, 0, patches_dct_ori)
+        patches_th = np.where(np.abs(patches_dct_ori) < threshold, 0, patches_dct_ori)
         fig_original = px.imshow(patches_th[0,:, :, 0])
         fig_original.update_traces(text=np.round(patches_th[0,:, :, 0], 2),
                     hoverinfo='text',
@@ -234,9 +235,10 @@ def denoising_image(args):
         col1.plotly_chart(fig_1, use_container_width=True)
         col2.plotly_chart(fig_2, use_container_width=True)
         
-    image_trans = ColorTransform(noisy_image, DCTbasis3x3, flag=1)
+    # image_trans = ColorTransform(noisy_image, DCTbasis3x3, flag=1)
+    image_trans = noisy_image
     newImg = sliding_window_denoising(image_trans, size_block, stride, threshold)
-    newImg = ColorTransform(newImg, DCTbasis3x3, flag=-1)
+    # newImg = ColorTransform(newImg, DCTbasis3x3, flag=-1)
     newImg = np.clip(newImg, 0, 255).astype(np.uint8)
     
     if noise == "None":
@@ -307,9 +309,9 @@ def denoising_image(args):
     
     else:
     
-        psnr_value_noise = metrics.peak_signal_noise_ratio(noisy_image, newImg)
-        mse_value_noise = metrics.mean_squared_error(noisy_image, newImg)
-        ssim_value_noise = metrics.structural_similarity(noisy_image, newImg, win_size=3)
+        psnr_value_noise = metrics.peak_signal_noise_ratio(img, noisy_image)
+        mse_value_noise = metrics.mean_squared_error(img, noisy_image)
+        ssim_value_noise = metrics.structural_similarity(img, noisy_image, win_size=3)
             
         # st.write(f"### Image Quality Metrics  (Size Block={size_block}, Noise={noise}, Sigma={sigma}, Threshold={threshold}, Stride={stride})")
         # table_data = {"PSNR": [psnr_value], "MSE": [mse_value], "SSIM": [ssim_value]}
@@ -320,7 +322,7 @@ def denoising_image(args):
         ssim_value = metrics.structural_similarity(img, newImg, win_size=3)
             
         st.write(f"### Image Quality Metrics  (Size Block={size_block}, Noise={noise}, Sigma={sigma}, Threshold={threshold}, Stride={stride})")
-        table_data = {"Type Image":["Denoising Image", "Noisy Image"],"PSNR": [psnr_value, psnr_value_noise], "MSE": [mse_value, mse_value_noise], "SSIM": [ssim_value,ssim_value_noise]}
+        table_data = {"Type Image":["Denoising Image", "Noisy Image"], "PSNR": [psnr_value, psnr_value_noise], "MSE": [mse_value, mse_value_noise], "SSIM": [ssim_value,ssim_value_noise]}
         table = st.table(table_data)
     
 
