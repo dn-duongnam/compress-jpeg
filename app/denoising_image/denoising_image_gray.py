@@ -12,29 +12,6 @@ from scipy.ndimage import gaussian_filter
 from skimage import io, metrics
 import pandas as pd
 
-
-DCTbasis3x3 = np.array([
-    [   0.5773502588272094726562500000000000000000,
-        0.5773502588272094726562500000000000000000,
-        0.5773502588272094726562500000000000000000,     ],
-    [  0.7071067690849304199218750000000000000000,
-      0.0000000000000000000000000000000000000000,
-      -0.7071067690849304199218750000000000000000, ],
-    [
-        0.4082483053207397460937500000000000000000,
-        -0.8164966106414794921875000000000000000000,
-        0.4082483053207397460937500000000000000000      ]
-])
-
-def ColorTransform(img, DCTbasis3x3, flag=1):
-    image_flat = img.reshape(-1, 3)
-    if flag == 1:
-        transformed_image_flat = np.dot(image_flat, DCTbasis3x3.T)
-    else:
-        transformed_image_flat = np.dot(image_flat, DCTbasis3x3)
-    transformed_image_flat = transformed_image_flat.reshape(img.shape)
-    return transformed_image_flat
-
 def image2Patches(img, size_patch, stride):
     h, w = img.shape[0:2]
     w_h, w_w = size_patch,size_patch
@@ -90,8 +67,8 @@ def add_poisson_noise(image, scale_factor):
 def addSpeckleNoise(img, intensity=0.5):
     image = img.copy()
     # Generate speckle noise
-    row, col, c = image.shape
-    speckle = intensity * np.random.randn(row, col, c)
+    row, col = image.shape
+    speckle = intensity * np.random.randn(row, col)
     
     # Add the noise to the image
     noisy = image + image * speckle
@@ -104,7 +81,7 @@ def addSpeckleNoise(img, intensity=0.5):
     
     return noisy
 
-def denoising_image(args):
+def denoising_image_gray(args):
     st.title('Image Color Display App')
     # upload and read image
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
@@ -139,10 +116,12 @@ def denoising_image(args):
     else:
         img = img_raw
         
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    
     if noise == "Gaussian":
-        rows, cols, channels = img.shape
+        rows, cols = img.shape
         mean = 0
-        noise_val = np.random.normal(mean, sigma, (rows, cols, channels))
+        noise_val = np.random.normal(mean, sigma, (rows, cols))
         noisy_image = np.clip(img + noise_val, 0, 255).astype(np.uint8)
     elif noise == "Salt and Pepper":
         salt_prob, pepper_prob = sigma / 1000, sigma / 1000
