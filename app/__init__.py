@@ -3,3 +3,4 @@ from .gray_image.gray_image import gray_image_jpeg
 from .denoising_image.denoising_image import denoising_image
 from .denoising_image.denoising_periodic import denoising_periodic
 from .denoising_image.denoising_image_gray import denoising_image_gray
+from .denoising_image.denoising_image_gaussian_weight import denoising_image_gaussian

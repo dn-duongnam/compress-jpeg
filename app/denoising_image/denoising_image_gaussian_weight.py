@@ -41,12 +41,32 @@ def image2Patches(img, size_patch, stride):
     s_h, s_w = stride, stride
     starting_points = [(x, y)  for x in set( list(range(0, h - w_h, s_h)) + [h - w_h] ) 
                                 for y in set( list(range(0, w - w_w, s_w)) + [w - w_w] )]
-    patches = np.empty((len(starting_points), w_h, w_w, 3), dtype='float64')
-    for i, (x, y) in enumerate(starting_points):
+    patches = np.empty((2, w_h, w_w, 3), dtype='float64')
+    for i, (x, y) in enumerate(starting_points[:2]):
         patches[i] = img[x:x + w_h, y:y + w_w, :]
     return patches
 
-def sliding_window_denoising(img, size_patch, stride, threshold):
+def get_gaussian(size_patch, num_channel, sigma_scale = 1./8):
+    patch_size = [size_patch, size_patch]
+    tmp = np.zeros(patch_size)
+    center_coords = [i // 2 for i in patch_size]
+    sigmas = [i * sigma_scale for i in patch_size]
+    tmp[tuple(center_coords)] = 1
+    gaussian_importance_map = gaussian_filter(tmp, sigmas, 0, mode='constant', cval=0)
+    gaussian_importance_map = gaussian_importance_map / np.max(gaussian_importance_map) * 1
+    gaussian_importance_map = gaussian_importance_map.astype(np.float32)
+
+    # gaussian_importance_map cannot be 0, otherwise we may end up with nans!
+    gaussian_importance_map[gaussian_importance_map == 0] = np.min(
+        gaussian_importance_map[gaussian_importance_map != 0])
+
+    result = np.zeros((*gaussian_importance_map.shape, num_channel))
+    for i in range(num_channel):
+        result[..., i] = gaussian_importance_map
+
+    return result
+
+def sliding_window_denoising_gauss(img, size_patch, stride, threshold, sigma_scale):
     h, w = img.shape[0:2]
     w_h, w_w = size_patch,size_patch
     s_h, s_w = stride, stride
@@ -54,6 +74,7 @@ def sliding_window_denoising(img, size_patch, stride, threshold):
     overlap = np.zeros((*img.shape[:-1], 3), dtype='float64')
     starting_points = [(x, y)  for x in set( list(range(0, h - w_h, s_h)) + [h - w_h] ) 
                                 for y in set( list(range(0, w - w_w, s_w)) + [w - w_w] )]
+    gaussian_weight = get_gaussian(size_patch, img.shape[2],sigma_scale=sigma_scale)
     patches = np.empty((len(starting_points), w_h, w_w, 3), dtype='float64')
     for i, (x, y) in enumerate(starting_points):
         patches[i] = img[x:x + w_h, y:y + w_w, :]
@@ -64,8 +85,8 @@ def sliding_window_denoising(img, size_patch, stride, threshold):
         
     for i in range(len(patches)):
         x, y = starting_points[i]
-        result[x:x + w_h, y:y + w_w, :] += patches_th[i]
-        overlap[x:x + w_h, y:y + w_w, :] += 1
+        result[x:x + w_h, y:y + w_w, :] += patches_th[i] * gaussian_weight
+        overlap[x:x + w_h, y:y + w_w, :] += gaussian_weight
 
     assert np.sum(overlap == 0.) == 0, "Sliding window does not cover all volume"
 
@@ -104,7 +125,7 @@ def addSpeckleNoise(img, intensity=0.5):
     
     return noisy
 
-def denoising_image(args):
+def denoising_image_gaussian(args):
     st.title('Image Color Display App')
     # upload and read image
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
@@ -115,8 +136,10 @@ def denoising_image(args):
     sigma = float(sigma.strip())
     threshold = st.text_input("Threshold: ", "30")
     threshold = float(threshold.strip())
-    stride = st.text_input("Stride: ", "1")
+    stride = st.text_input("Stride: ", "4")
     stride = int(stride.strip())
+    sigma_s = st.text_input("Sigma scale: ", "0.125")
+    sigma_s = float(sigma_s.strip())
     if uploaded_file is None: # catch error
         return ""
     file_bytes = uploaded_file.getvalue()
@@ -234,9 +257,7 @@ def denoising_image(args):
         col1.plotly_chart(fig_1, use_container_width=True)
         col2.plotly_chart(fig_2, use_container_width=True)
         
-    image_trans = ColorTransform(noisy_image, DCTbasis3x3, flag=1)
-    newImg = sliding_window_denoising(image_trans, size_block, stride, threshold)
-    newImg = ColorTransform(newImg, DCTbasis3x3, flag=-1)
+    newImg = sliding_window_denoising_gauss(noisy_image, size_block, stride, threshold, sigma_s)
     newImg = np.clip(newImg, 0, 255).astype(np.uint8)
     
     if noise == "None":
@@ -307,9 +328,9 @@ def denoising_image(args):
     
     else:
     
-        psnr_value_noise = metrics.peak_signal_noise_ratio(noisy_image, newImg)
-        mse_value_noise = metrics.mean_squared_error(noisy_image, newImg)
-        ssim_value_noise = metrics.structural_similarity(noisy_image, newImg, win_size=3)
+        psnr_value_noise = metrics.peak_signal_noise_ratio(img, noisy_image)
+        mse_value_noise = metrics.mean_squared_error(img, noisy_image)
+        ssim_value_noise = metrics.structural_similarity(img, noisy_image, win_size=3)
             
         # st.write(f"### Image Quality Metrics  (Size Block={size_block}, Noise={noise}, Sigma={sigma}, Threshold={threshold}, Stride={stride})")
         # table_data = {"PSNR": [psnr_value], "MSE": [mse_value], "SSIM": [ssim_value]}
