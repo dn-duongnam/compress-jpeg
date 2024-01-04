@@ -148,7 +148,7 @@ def denoising_image_gray(args):
         st.subheader('Original Noise Image DCT')
         st.plotly_chart(fig_original)
         
-        patches_th = np.where(patches_dct_ori < threshold, 0, patches_dct_ori)
+        patches_th = np.where(np.abs(patches_dct_ori) < threshold, 0, patches_dct_ori)
         fig_original = px.imshow(patches_th[0,:, :])
         fig_original.update_traces(text=np.round(patches_th[0,:, :], 2),
                     hoverinfo='text',
@@ -190,7 +190,7 @@ def denoising_image_gray(args):
         col1.plotly_chart(fig_1, use_container_width=True)
         col2.plotly_chart(fig_2, use_container_width=True)
         
-        patches_noise_th = np.where(patches_dct_ori < threshold, 0, patches_dct_ori)
+        patches_noise_th = np.where(np.abs(patches_dct_ori) < threshold, 0, patches_dct_ori)
         fig_1 = px.imshow(patches_dct_ori[0,:, :])
         fig_1.update_layout(title="Original Image DCT")
         fig_1.update_traces(text=np.round(patches_dct_ori[0,:, :], 2),
