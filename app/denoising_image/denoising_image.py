@@ -42,8 +42,8 @@ def image2Patches(img, size_patch, stride):
     s_h, s_w = stride, stride
     starting_points = [(x, y)  for x in set( list(range(0, h - w_h, s_h)) + [h - w_h] ) 
                                 for y in set( list(range(0, w - w_w, s_w)) + [w - w_w] )]
-    patches = np.empty((len(starting_points), w_h, w_w, 3), dtype='float64')
-    for i, (x, y) in enumerate(starting_points):
+    patches = np.empty((2, w_h, w_w, 3), dtype='float64')
+    for i, (x, y) in enumerate(starting_points[:2]):
         patches[i] = img[x:x + w_h, y:y + w_w, :]
     return patches
 
