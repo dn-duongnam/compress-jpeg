@@ -19,8 +19,8 @@ def add_noise_periodic(img, a, b):
     return noisy_image
 
 def add_noise_periodic2d(img, a, b):
-    x = np.linspace(0, 1,512) 
-    y = np.linspace(0, 1,512) 
+    x = np.linspace(0, 1, 512) 
+    y = np.linspace(0, 1, 512) 
     X,Y = np.meshgrid(x, y)
     noise = np.array([a*np.sin(b*np.pi*(X + Y)) * 255])
     noisy_image = np.clip(img + noise, 0, 255).astype(np.uint8)
@@ -30,7 +30,7 @@ def add_noise_periodic2d(img, a, b):
 def denoising_periodic(args):
     st.title('Denoising Periodic Display App')
     # upload and read image
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png", "bmp"])
 
 
     a = st.text_input('Input a: ', '0.25')
@@ -55,7 +55,7 @@ def denoising_periodic(args):
     file_bytes = uploaded_file.getvalue()
     nparr = np.frombuffer(file_bytes, np.uint8)
 
-    if uploaded_file.type in ['image/jpeg', 'image/jpg']:
+    if uploaded_file.type in ['image/jpeg', 'image/jpg', 'image/bmp']:
         img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
     elif uploaded_file.type == 'image/png':
         img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
@@ -131,9 +131,9 @@ def denoising_periodic(args):
     col2.plotly_chart(fig_2, use_container_width=True)
     
     
-    psnr_value_noise = metrics.peak_signal_noise_ratio(noisy_image, image)
-    mse_value_noise = metrics.mean_squared_error(noisy_image, image)
-    ssim_value_noise = metrics.structural_similarity(noisy_image, image, win_size=3)
+    psnr_value_noise = metrics.peak_signal_noise_ratio(image, noisy_image)
+    mse_value_noise = metrics.mean_squared_error(image, noisy_image)
+    ssim_value_noise = metrics.structural_similarity(image, noisy_image, win_size=3)
         
     # st.write(f"### Image Quality Metrics  (Size Block={size_block}, Noise={noise}, Sigma={sigma}, Threshold={threshold}, Stride={stride})")
     # table_data = {"PSNR": [psnr_value], "MSE": [mse_value], "SSIM": [ssim_value]}

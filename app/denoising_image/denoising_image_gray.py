@@ -84,7 +84,7 @@ def addSpeckleNoise(img, intensity=0.5):
 def denoising_image_gray(args):
     st.title('Image Color Display App')
     # upload and read image
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png", "bmp"])
     size_block = st.selectbox("Size block:", [8, 16, 32, 64])
     
     noise = st.selectbox("Noise:", ["Gaussian", "Salt and Pepper", "Poisson","Speckle" , "None"])
@@ -99,7 +99,7 @@ def denoising_image_gray(args):
     file_bytes = uploaded_file.getvalue()
     nparr = np.frombuffer(file_bytes, np.uint8)
 
-    if uploaded_file.type in ['image/jpeg', 'image/jpg']:
+    if uploaded_file.type in ['image/jpeg', 'image/jpg', 'image/bmp']:
         img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
     elif uploaded_file.type == 'image/png':
         img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)

@@ -225,7 +225,7 @@ def gray_image_jpeg(args):
     st.title('Image Gray Display App')
 
     # upload and read image
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png"])
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "arw", "cr2", "png", "bmp"])
     quality = st.text_input('Quality Compressed: ', '90')
     quality = int(quality.strip())
     if uploaded_file is None: # catch error
@@ -233,7 +233,7 @@ def gray_image_jpeg(args):
     file_bytes = uploaded_file.getvalue()
     nparr = np.frombuffer(file_bytes, np.uint8)
 
-    if uploaded_file.type in ['image/jpeg', 'image/jpg']:
+    if uploaded_file.type in ['image/jpeg', 'image/jpg', 'image/bmp']:
         img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
     elif uploaded_file.type == 'image/png':
         img_raw = cv2.cvtColor(cv2.imdecode(nparr, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
