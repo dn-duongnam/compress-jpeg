@@ -114,8 +114,8 @@ Through this project, users will gain insights into the inner workings of the JP
 
 This section have list any major frameworks/libraries used in this project. 
 
-* [![Python][Python.com]][Python-url]
-* [![Streamlit][Streamlit.com]][Streamlit-url]
+* [![Python][Python]][Python-url]
+* [![Streamlit][Streamlit]][Streamlit-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -275,7 +275,7 @@ Use this space to list resources you find helpful and would like to give credit 
 [license-shield]: https://img.shields.io/github/license/dn-duongnam/compress-jpeg.svg?style=for-the-badge
 [license-url]: https://github.com/dn-duongnam/compress-jpeg/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/othneildrew
+[linkedin-url]: https://www.linkedin.com/in/l%C3%A3-%C4%91%E1%BB%A9c-nam-9b27b4219/
 [product-screenshot]: images/screenshot.png
 [Python]: https://img.shields.io/badge/Python-563D7C?style=for-the-badge&logo=Python&logoColor=white
 [Python-url]: https://getbootstrap.com
