@@ -1,0 +1,9 @@
+huffman==0.1.2
+numpy==1.23.5
+opencv_python_headless==4.8.1.78
+pandas==1.5.1
+plotly==5.11.0
+rawpy==0.18.1
+scipy==1.11.4
+skimage==0.0
+streamlit==1.20.0
