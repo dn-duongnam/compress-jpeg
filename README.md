@@ -166,21 +166,21 @@ This will start the development server, and you can access the Streamlit app by 
 
 Welcome to the Image Processing website! Below is a detailed guide to help you make the most of the features on the platform.
 
-1. Step 1: Upload Image
-   Access the Image Processing website at Link to Your Website.
-   You will see a simple interface with the "Upload Image" button. Click on this button to select and upload the image you want to process.
+Step 1: Upload Image
+- Access the Image Processing website at Link to Your Website.
+- You will see a simple interface with the "Upload Image" button. Click on this button to select and upload the image you want to process.
 
-2. Step 2: Adjust Parameters
-   Once the image is successfully uploaded, you will see parameter adjustment options displayed on the interface.
-   Options may include choosing a quantization matrix, setting thresholds for the denoising algorithm, and other parameters depending on the specific features of the website.
+Step 2: Adjust Parameters
+- Once the image is successfully uploaded, you will see parameter adjustment options displayed on the interface.
+- Options may include choosing a quantization matrix, setting thresholds for the denoising algorithm, and other - parameters depending on the specific features of the website.
 
-3. Step 3: Process Image
-   After adjusting the parameters to your liking, click on the "Process Image" or a similar button.
-   The website will proceed to process the image based on the parameters you have selected.
+Step 3: Process Image
+- After adjusting the parameters to your liking, click on the "Process Image" or a similar button.
+- The website will proceed to process the image based on the parameters you have selected.
 
-4. Step 4: Observe Results
-   The processed image results will be displayed once the operation is complete.
-   You can compare the original and processed images to evaluate the performance of the chosen parameter adjustments.
+Step 4: Observe Results
+- The processed image results will be displayed once the operation is complete.
+- You can compare the original and processed images to evaluate the performance of the chosen parameter adjustments.
 
 Note:
 - Processing times may vary depending on the size of the image and the complexity of the selected parameters.
@@ -239,7 +239,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 Lã Đức Nam - ducnamla@gmail.com
 
-Project Link: [https://github.com/your_username/repo_name](https://github.com/your_username/repo_name)
+Project Link: [https://github.com/dn-duongnam/compress-jpeg](https://github.com/dn-duongnam/compress-jpeg)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
